@@ -15,8 +15,17 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
       color: #ffcc00;
+    }
+
+    /* Timer-Anzeige */
+    #gameTimer {
+      text-align: center;
+      font-size: 3rem;
+      font-weight: bold;
+      color: #00ffcc;
+      margin-bottom: 20px;
     }
 
     .controls {
@@ -95,6 +104,9 @@
 <body>
   <h1>Dota 2 Timer Tool</h1>
 
+  <!-- Timer-Anzeige -->
+  <div id="gameTimer">00:00</div>
+
   <!-- General controls -->
   <div class="controls">
     <div>
@@ -165,6 +177,7 @@
     <button id="startButton">Timer starten</button>
     <button id="stopButton">Timer stoppen</button>
   </div>
+
   <script>
     // Interval constants (seconds)
     const RUNE_INTERVAL = 2 * 60;
@@ -172,7 +185,7 @@
     const TORM_INTERVAL = 10 * 60;
     const LOTUS_INTERVAL_NORMAL = 3 * 60;
     const LOTUS_INTERVAL_TURBO = 90;
-    const PULL_INTERVAL = 0.83333 * 60;
+    const PULL_INTERVAL = 1 * 60;
 
     // Sound URLs
     const runeSoundUrl = 'sounds/river_rune.mp3';
@@ -186,9 +199,18 @@
     let runeInitialTimer, xpRuneInitialTimer, tormInitialTimer, lotusInitialTimer, pullInitialTimer;
     let currentLotusInterval = LOTUS_INTERVAL_NORMAL;
 
+    // Lautstärken
+    const volumes = {
+      rune: 1,
+      xpRune: 1,
+      lotus: 1,
+      torm: 1,
+      pull: 1,
+    };
+
     function playSound(url, volume) {
       const audio = new Audio(url);
-      audio.volume = volume; // value between 0.0 and 1.0
+      audio.volume = volume;
       audio.play().catch(e => console.error("Fehler beim Abspielen des Sounds:", e));
     }
 
@@ -207,7 +229,7 @@
       return remainder === 0 ? 0 : intervalMs - remainder;
     }
 
-    function startTimers(initialOffsetInSeconds, offsets, volumes) {
+    function startTimers(initialOffsetInSeconds, offsets) {
       const initialOffsetMs = initialOffsetInSeconds * 1000;
 
       // Rune
@@ -268,6 +290,37 @@
       startButton.textContent = 'Timer starten';
     }
 
+    // Game-Timer Anzeige
+    let gameTimerInterval = null;
+    let gameStartTime = null;
+    let gameInitialOffset = 0;
+    let lastElapsed = 0;
+
+    function startGameTimer(initialOffsetInSeconds) {
+      stopGameTimer(false); // Falls noch einer läuft
+
+      gameStartTime = Date.now();
+      gameInitialOffset = initialOffsetInSeconds;
+
+      gameTimerInterval = setInterval(() => {
+        lastElapsed = Math.floor((Date.now() - gameStartTime) / 1000) + gameInitialOffset;
+        document.getElementById('gameTimer').textContent = formatTime(lastElapsed);
+      }, 1000);
+    }
+
+    function stopGameTimer(reset = true) {
+      if (gameTimerInterval) {
+        clearInterval(gameTimerInterval);
+        gameTimerInterval = null;
+      }
+
+      if (reset) {
+        lastElapsed = 0;
+        document.getElementById('gameTimer').textContent = "00:00";
+      }
+    }
+
+    // Event-Listener
     document.addEventListener('DOMContentLoaded', () => {
       const timerSlider = document.getElementById('timerSlider');
       const currentValueSpan = document.getElementById('currentValue');
@@ -292,6 +345,7 @@
         pull: document.getElementById('offsetPullDisplay'),
       };
 
+      // Lautstärke Inputs
       const volumeInputs = {
         rune: document.getElementById('volumeRune'),
         xpRune: document.getElementById('volumeXpRune'),
@@ -300,13 +354,11 @@
         pull: document.getElementById('volumePull'),
       };
 
-      const volumeDisplays = {
-        rune: document.getElementById('volumeRuneDisplay'),
-        xpRune: document.getElementById('volumeXpRuneDisplay'),
-        lotus: document.getElementById('volumeLotusDisplay'),
-        torm: document.getElementById('volumeTormDisplay'),
-        pull: document.getElementById('volumePullDisplay'),
-      };
+      Object.keys(volumeInputs).forEach(key => {
+        volumeInputs[key].addEventListener('input', () => {
+          volumes[key] = parseFloat(volumeInputs[key].value);
+        });
+      });
 
       // Slider update
       timerSlider.addEventListener('input', () => {
@@ -317,13 +369,6 @@
       Object.keys(offsetInputs).forEach(key => {
         offsetInputs[key].addEventListener('input', () => {
           offsetDisplays[key].textContent = formatTime(parseInt(offsetInputs[key].value, 10));
-        });
-      });
-
-      // Volume input updates
-      Object.keys(volumeInputs).forEach(key => {
-        volumeInputs[key].addEventListener('input', () => {
-          volumeDisplays[key].textContent = volumeInputs[key].value + "%";
         });
       });
 
@@ -343,32 +388,26 @@
           torm: parseInt(offsetInputs.torm.value, 10),
           pull: parseInt(offsetInputs.pull.value, 10),
         };
-        const volumes = {
-          rune: volumeInputs.rune.value / 100,
-          xpRune: volumeInputs.xpRune.value / 100,
-          lotus: volumeInputs.lotus.value / 100,
-          torm: volumeInputs.torm.value / 100,
-          pull: volumeInputs.pull.value / 100,
-        };
 
         startButton.disabled = true;
         timerSlider.disabled = true;
         modeSelect.disabled = true;
         startButton.textContent = 'Timer läuft...';
 
-        startTimers(initialDelay, offsets, volumes);
+        startGameTimer(initialDelay);
+        startTimers(initialDelay, offsets);
       });
 
       // Stop
-      stopButton.addEventListener('click', () => stopTimers());
+      stopButton.addEventListener('click', () => {
+        stopGameTimer();
+        stopTimers();
+      });
 
       // Init values
       currentValueSpan.textContent = formatTime(parseInt(timerSlider.value, 10));
       Object.keys(offsetInputs).forEach(key => {
         offsetDisplays[key].textContent = formatTime(parseInt(offsetInputs[key].value, 10));
-      });
-      Object.keys(volumeInputs).forEach(key => {
-        volumeDisplays[key].textContent = volumeInputs[key].value + "%";
       });
       lotusIntervalDisplay.textContent = formatTime(currentLotusInterval);
     });
