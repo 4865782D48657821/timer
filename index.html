@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <label for="timerSlider">Timer (Sekunden):</label>
+<input type="range" id="timerSlider" name="timerSlider" min="-90" max="3600" value="0">
+<p>Aktueller Wert: <span id="currentValue">0</span>s</p>
+<button id="startButton">Timer starten</button>
+</body>
+<script>
+// Timings in Minuten und Konstanten für die Sounds
+const RUNE_INTERVAL_MIN = 2;
+const XP_RUNE_INTERVAL_MIN = 7;
+const TORM_INTERVAL_MIN = 10;
+
+// URLs für die Sound-Dateien
+const runeSoundUrl = 'sounds/rune.mp3';
+const xpRuneSoundUrl = 'sounds/xp_rune.mp3';
+const tormSoundUrl = 'sounds/torm.mp3';
+
+// Hilfsfunktion zum Abspielen eines Sounds
+function playSound(url) {
+  const audio = new Audio(url);
+  audio.play().catch(e => console.error("Fehler beim Abspielen des Sounds:", e));
+}
+
+// Hilfsfunktion zur Berechnung der nächsten Taktung
+function getNextTick(currentTimeMs, intervalMs) {
+  const remainder = currentTimeMs % intervalMs;
+  if (remainder === 0) {
+    // Wenn der Startwert genau auf einem Intervall liegt, spiele den Sound sofort ab
+    return 0;
+  }
+  return intervalMs - remainder;
+}
+
+// Hauptfunktion, die die Timer mit einem bestimmten Offset startet
+function startTimers(initialOffsetInSeconds) {
+  const initialOffsetInMilliseconds = initialOffsetInSeconds * 1000;
+
+  // Starte Rune-Sound-Timer
+  setTimeout(() => {
+    playSound(runeSoundUrl);
+    setInterval(() => {
+      playSound(runeSoundUrl);
+    }, RUNE_INTERVAL_MIN * 60 * 1000);
+  }, getNextTick(initialOffsetInMilliseconds, RUNE_INTERVAL_MIN * 60 * 1000));
+
+  // Starte XP Rune-Sound-Timer
+  setTimeout(() => {
+    playSound(xpRuneSoundUrl);
+    setInterval(() => {
+      playSound(xpRuneSoundUrl);
+    }, XP_RUNE_INTERVAL_MIN * 60 * 1000);
+  }, getNextTick(initialOffsetInMilliseconds, XP_RUNE_INTERVAL_MIN * 60 * 1000));
+
+  // Starte Torm-Sound-Timer (jetzt mit denselben Regeln wie die anderen)
+  setTimeout(() => {
+    playSound(tormSoundUrl);
+    setInterval(() => {
+      playSound(tormSoundUrl);
+    }, TORM_INTERVAL_MIN * 60 * 1000);
+  }, getNextTick(initialOffsetInMilliseconds, TORM_INTERVAL_MIN * 60 * 1000));
+}
+
+// Event-Listener für den Schieberegler und Start-Button
+document.addEventListener('DOMContentLoaded', () => {
+  const timerSlider = document.getElementById('timerSlider');
+  const currentValueSpan = document.getElementById('currentValue');
+  const startButton = document.getElementById('startButton');
+
+  // Zeigt den aktuellen Wert des Schiebereglers an
+  timerSlider.addEventListener('input', () => {
+    currentValueSpan.textContent = timerSlider.value;
+  });
+
+  // Start-Button-Logik
+  startButton.addEventListener('click', () => {
+    const initialDelay = parseInt(timerSlider.value, 10);
+
+    // Deaktiviere den Button und den Slider, sobald der Timer läuft
+    startButton.disabled = true;
+    timerSlider.disabled = true;
+    startButton.textContent = 'Timer läuft...';
+
+    // Starte die Timer mit dem initialen Offset
+    startTimers(initialDelay);
+  });
+});
+</script>
+</html>
