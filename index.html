@@ -109,6 +109,7 @@
         lotusTimer = setInterval(() => playSound(lotusSoundUrl), currentLotusInterval * 1000);
       }, Math.max(0, lotusDelay));
 
+      // Pull
          let pullDelay = getNextTick(initialOffsetMs, PULL_INTERVAL * 1000) - offsets.pull * 1000;
       pullInitialTimer = setTimeout(() => {
         playSound(pullSoundUrl);
@@ -133,7 +134,7 @@
       clearTimeout(xpRuneInitialTimer);
       clearTimeout(lotusInitialTimer);
       clearTimeout(tormInitialTimer);
-      clearTimeout(pullTimer);
+      clearTimeout(pullInitialTimer);
 
       const startButton = document.getElementById('startButton');
       const timerSlider = document.getElementById('timerSlider');
