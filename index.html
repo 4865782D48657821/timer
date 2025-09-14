@@ -6,10 +6,18 @@
     <title>Document</title>
 </head>
 <body>
-    <label for="timerSlider">Timer (Sekunden):</label>
+<label for="timerSlider">Start-Offset (Sekunden):</label>
 <input type="range" id="timerSlider" name="timerSlider" min="-90" max="3600" value="0">
-<p>Aktueller Wert: <span id="currentValue">0</span>s</p>
+<p>Aktueller Startwert: <span id="currentValue">0</span>s</p>
+
+---
+<label for="playbackOffset">Vorziehen (Sekunden):</label>
+<input type="number" id="playbackOffset" name="playbackOffset" value="0" min="0">
+<p>Aktueller Vorzug: <span id="currentPlaybackOffset">0</span>s</p>
+
+---
 <button id="startButton">Timer starten</button>
+<button id="stopButton">Timer stoppen</button>
 </body>
 <script>
 // Timings in Minuten und Konstanten für die Sounds
@@ -22,74 +30,137 @@ const runeSoundUrl = 'sounds/rune.mp3';
 const xpRuneSoundUrl = 'sounds/xp_rune.mp3';
 const tormSoundUrl = 'sounds/torm.mp3';
 
+// Globale Variablen, um die Timer-IDs zu speichern
+let runeTimer, xpRuneTimer, tormTimer, tormInitialTimer;
+
 // Hilfsfunktion zum Abspielen eines Sounds
 function playSound(url) {
   const audio = new Audio(url);
   audio.play().catch(e => console.error("Fehler beim Abspielen des Sounds:", e));
 }
 
+// NEUE Hilfsfunktion zur Formatierung der Zeit in min:sek
+function formatTime(seconds) {
+  const isNegative = seconds < 0;
+  const absSeconds = Math.abs(seconds);
+  
+  const minutes = Math.floor(absSeconds / 60);
+  const remainingSeconds = absSeconds % 60;
+  
+  // Füge führende Nullen hinzu, wenn nötig
+  const formattedMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
+  const formattedSeconds = remainingSeconds < 10 ? `0${remainingSeconds}` : `${remainingSeconds}`;
+  
+  // Behandle negative Werte
+  if (isNegative) {
+    return `-${formattedMinutes}:${formattedSeconds}`;
+  }
+  
+  return `${formattedMinutes}:${formattedSeconds}`;
+}
+
 // Hilfsfunktion zur Berechnung der nächsten Taktung
 function getNextTick(currentTimeMs, intervalMs) {
   const remainder = currentTimeMs % intervalMs;
   if (remainder === 0) {
-    // Wenn der Startwert genau auf einem Intervall liegt, spiele den Sound sofort ab
     return 0;
   }
   return intervalMs - remainder;
 }
 
-// Hauptfunktion, die die Timer mit einem bestimmten Offset startet
-function startTimers(initialOffsetInSeconds) {
+// Hauptfunktion, die die Timer startet
+function startTimers(initialOffsetInSeconds, playbackOffsetInSeconds) {
   const initialOffsetInMilliseconds = initialOffsetInSeconds * 1000;
+  const playbackOffsetInMilliseconds = playbackOffsetInSeconds * 1000;
 
   // Starte Rune-Sound-Timer
+  let runeDelay = getNextTick(initialOffsetInMilliseconds, RUNE_INTERVAL_MIN * 60 * 1000) - playbackOffsetInMilliseconds;
   setTimeout(() => {
     playSound(runeSoundUrl);
-    setInterval(() => {
+    runeTimer = setInterval(() => {
       playSound(runeSoundUrl);
     }, RUNE_INTERVAL_MIN * 60 * 1000);
-  }, getNextTick(initialOffsetInMilliseconds, RUNE_INTERVAL_MIN * 60 * 1000));
+  }, Math.max(0, runeDelay));
 
   // Starte XP Rune-Sound-Timer
+  let xpRuneDelay = getNextTick(initialOffsetInMilliseconds, XP_RUNE_INTERVAL_MIN * 60 * 1000) - playbackOffsetInMilliseconds;
   setTimeout(() => {
     playSound(xpRuneSoundUrl);
-    setInterval(() => {
+    xpRuneTimer = setInterval(() => {
       playSound(xpRuneSoundUrl);
     }, XP_RUNE_INTERVAL_MIN * 60 * 1000);
-  }, getNextTick(initialOffsetInMilliseconds, XP_RUNE_INTERVAL_MIN * 60 * 1000));
+  }, Math.max(0, xpRuneDelay));
 
-  // Starte Torm-Sound-Timer (jetzt mit denselben Regeln wie die anderen)
-  setTimeout(() => {
+  // Starte Torm-Sound-Timer
+  let tormDelay = getNextTick(initialOffsetInMilliseconds, TORM_INTERVAL_MIN * 60 * 1000) - playbackOffsetInMilliseconds;
+  tormInitialTimer = setTimeout(() => {
     playSound(tormSoundUrl);
-    setInterval(() => {
+    tormTimer = setInterval(() => {
       playSound(tormSoundUrl);
     }, TORM_INTERVAL_MIN * 60 * 1000);
-  }, getNextTick(initialOffsetInMilliseconds, TORM_INTERVAL_MIN * 60 * 1000));
+  }, Math.max(0, tormDelay));
 }
 
-// Event-Listener für den Schieberegler und Start-Button
+// Funktion zum Stoppen aller Timer
+function stopTimers() {
+  clearInterval(runeTimer);
+  clearInterval(xpRuneTimer);
+  clearInterval(tormTimer);
+  clearTimeout(tormInitialTimer);
+
+  // Setze die Benutzeroberfläche zurück
+  const startButton = document.getElementById('startButton');
+  const timerSlider = document.getElementById('timerSlider');
+  const playbackOffsetInput = document.getElementById('playbackOffset');
+
+  startButton.disabled = false;
+  timerSlider.disabled = false;
+  playbackOffsetInput.disabled = false;
+  startButton.textContent = 'Timer starten';
+}
+
+// Event-Listener für Schieberegler, Offset-Feld und Buttons
 document.addEventListener('DOMContentLoaded', () => {
   const timerSlider = document.getElementById('timerSlider');
   const currentValueSpan = document.getElementById('currentValue');
+  const playbackOffsetInput = document.getElementById('playbackOffset');
+  const currentPlaybackOffsetSpan = document.getElementById('currentPlaybackOffset');
   const startButton = document.getElementById('startButton');
+  const stopButton = document.getElementById('stopButton');
 
-  // Zeigt den aktuellen Wert des Schiebereglers an
+  // Zeigt den Wert des Start-Sliders an, formatiert als min:sek
   timerSlider.addEventListener('input', () => {
-    currentValueSpan.textContent = timerSlider.value;
+    currentValueSpan.textContent = formatTime(parseInt(timerSlider.value, 10));
+  });
+
+  // Zeigt den Wert des Playback-Offsets an, formatiert als min:sek
+  playbackOffsetInput.addEventListener('input', () => {
+    currentPlaybackOffsetSpan.textContent = formatTime(parseInt(playbackOffsetInput.value, 10));
   });
 
   // Start-Button-Logik
   startButton.addEventListener('click', () => {
     const initialDelay = parseInt(timerSlider.value, 10);
+    const playbackOffset = parseInt(playbackOffsetInput.value, 10);
 
-    // Deaktiviere den Button und den Slider, sobald der Timer läuft
+    // Deaktiviere Button und Eingabefelder
     startButton.disabled = true;
     timerSlider.disabled = true;
+    playbackOffsetInput.disabled = true;
     startButton.textContent = 'Timer läuft...';
 
-    // Starte die Timer mit dem initialen Offset
-    startTimers(initialDelay);
+    // Starte die Timer mit den eingestellten Offsets
+    startTimers(initialDelay, playbackOffset);
   });
+
+  // Stopp-Button-Logik
+  stopButton.addEventListener('click', () => {
+    stopTimers();
+  });
+  
+  // Setze die Startwerte beim Laden der Seite
+  currentValueSpan.textContent = formatTime(parseInt(timerSlider.value, 10));
+  currentPlaybackOffsetSpan.textContent = formatTime(parseInt(playbackOffsetInput.value, 10));
 });
 </script>
 </html>
